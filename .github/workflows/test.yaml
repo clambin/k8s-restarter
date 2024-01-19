@@ -3,7 +3,7 @@ name: Test
 on:
   push:
     branches-ignore:
-      - master
+      - main
       - fix
   pull_request_target:
 

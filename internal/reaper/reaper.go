@@ -20,7 +20,6 @@ func (r *Reaper) Reap(ctx context.Context, namespace, labelSelector string) (int
 	if err != nil {
 		return 0, err
 	}
-	slog.Debug("found pods", "count", len(pods))
 
 	var deleted int
 	for _, pod := range r.getNotReady(pods) {

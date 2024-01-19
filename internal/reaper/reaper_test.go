@@ -32,6 +32,14 @@ func TestReaper_Reap(t *testing.T) {
 			wantErr: assert.Error,
 			want:    0,
 		},
+		{
+			name: "one not-running pod",
+			pods: []coreV1.Pod{{
+				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-1", UID: "pod-foo-1"},
+			}},
+			wantErr: assert.NoError,
+			want:    0,
+		},
 
 		{
 			name: "one running pod",
