@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"github.com/stretchr/testify/assert"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +75,7 @@ func TestClient_GetPodsForLabelSelector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			c := Client{Connector: func() (kubernetes.Interface, error) {
+			c := Client{Connect: func() (kubernetes.Interface, error) {
 				return fake.NewSimpleClientset(tt.objects...), nil
 			}}
 			pods, err := c.GetPodsForLabelSelector(ctx, tt.args.namespace, tt.args.labelSelector)
@@ -87,6 +88,18 @@ func TestClient_GetPodsForLabelSelector(t *testing.T) {
 			for _, pod := range pods {
 				assert.NoError(t, c.DeletePod(ctx, tt.args.namespace, pod.GetName()))
 			}
+
+			c.Disconnect()
 		})
 	}
+}
+
+func TestClient_ConnectError(t *testing.T) {
+	c := Client{Connect: func() (kubernetes.Interface, error) {
+		return nil, errors.New("k8s connect error")
+	}}
+
+	assert.Panics(t, func() {
+		_, _ = c.GetPodsForLabelSelector(context.Background(), "namespace", "app=foo")
+	})
 }

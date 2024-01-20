@@ -71,6 +71,38 @@ func (_c *PodMan_DeletePod_Call) RunAndReturn(run func(context.Context, string, 
 	return _c
 }
 
+// Disconnect provides a mock function with given fields:
+func (_m *PodMan) Disconnect() {
+	_m.Called()
+}
+
+// PodMan_Disconnect_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Disconnect'
+type PodMan_Disconnect_Call struct {
+	*mock.Call
+}
+
+// Disconnect is a helper method to define mock.On call
+func (_e *PodMan_Expecter) Disconnect() *PodMan_Disconnect_Call {
+	return &PodMan_Disconnect_Call{Call: _e.mock.On("Disconnect")}
+}
+
+func (_c *PodMan_Disconnect_Call) Run(run func()) *PodMan_Disconnect_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *PodMan_Disconnect_Call) Return() *PodMan_Disconnect_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *PodMan_Disconnect_Call) RunAndReturn(run func()) *PodMan_Disconnect_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPodsForLabelSelector provides a mock function with given fields: ctx, namespace, labelSelector
 func (_m *PodMan) GetPodsForLabelSelector(ctx context.Context, namespace string, labelSelector string) ([]v1.Pod, error) {
 	ret := _m.Called(ctx, namespace, labelSelector)

@@ -1,44 +1,44 @@
-package reaper
+package scanner_test
 
 import (
 	"context"
 	"errors"
-	"github.com/clambin/k8s-restarter/internal/reaper/mocks"
+	"github.com/clambin/k8s-restarter/internal/scanner"
+	"github.com/clambin/k8s-restarter/internal/scanner/mocks"
 	"github.com/stretchr/testify/assert"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log/slog"
 	"testing"
+	"time"
 )
 
-func TestReaper_Reap(t *testing.T) {
+func TestScanner_ScanOnce(t *testing.T) {
 	tests := []struct {
-		name    string
-		pods    []coreV1.Pod
-		getErr  error
-		delErr  error
-		wantErr assert.ErrorAssertionFunc
-		want    int
+		name       string
+		pods       []coreV1.Pod
+		getErr     error
+		delErr     error
+		wantErr    assert.ErrorAssertionFunc
+		wantDelete bool
 	}{
 		{
 			name:    "no pods",
 			pods:    []coreV1.Pod{},
 			wantErr: assert.NoError,
-			want:    0,
 		},
 		{
 			name:    "get failed",
 			pods:    []coreV1.Pod{},
 			getErr:  errors.New("failed"),
 			wantErr: assert.Error,
-			want:    0,
 		},
 		{
 			name: "one not-running pod",
 			pods: []coreV1.Pod{{
-				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-1", UID: "pod-foo-1"},
+				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-1"},
 			}},
 			wantErr: assert.NoError,
-			want:    0,
 		},
 
 		{
@@ -48,7 +48,6 @@ func TestReaper_Reap(t *testing.T) {
 				Status:     coreV1.PodStatus{Phase: "Running", Conditions: []coreV1.PodCondition{{Type: "Ready", Status: "True"}}},
 			}},
 			wantErr: assert.NoError,
-			want:    0,
 		},
 		{
 			name: "one failing pod",
@@ -56,8 +55,8 @@ func TestReaper_Reap(t *testing.T) {
 				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-bad", UID: "pod-foo-1"},
 				Status:     coreV1.PodStatus{Phase: "Running", Conditions: []coreV1.PodCondition{{Type: "Ready", Status: "False"}}},
 			}},
-			wantErr: assert.NoError,
-			want:    1,
+			wantErr:    assert.NoError,
+			wantDelete: true,
 		},
 		{
 			name: "one failing pod - delete failed",
@@ -65,9 +64,9 @@ func TestReaper_Reap(t *testing.T) {
 				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-bad", UID: "pod-foo-1"},
 				Status:     coreV1.PodStatus{Phase: "Running", Conditions: []coreV1.PodCondition{{Type: "Ready", Status: "False"}}},
 			}},
-			delErr:  errors.New("failed"),
-			wantErr: assert.NoError,
-			want:    0,
+			delErr:     errors.New("failed"),
+			wantErr:    assert.NoError,
+			wantDelete: true,
 		},
 		{
 			name: "one of many pods failing",
@@ -78,8 +77,8 @@ func TestReaper_Reap(t *testing.T) {
 				ObjectMeta: metaV1.ObjectMeta{Namespace: "media", Name: "foo-2", UID: "pod-foo-2", OwnerReferences: []metaV1.OwnerReference{{UID: "rs-foo-1"}}},
 				Status:     coreV1.PodStatus{Phase: "Running", Conditions: []coreV1.PodCondition{{Type: "Ready", Status: "True"}}},
 			}},
-			wantErr: assert.NoError,
-			want:    1,
+			wantErr:    assert.NoError,
+			wantDelete: true,
 		},
 	}
 
@@ -90,13 +89,41 @@ func TestReaper_Reap(t *testing.T) {
 
 			ctx := context.Background()
 			p := mocks.NewPodMan(t)
-			p.EXPECT().GetPodsForLabelSelector(ctx, "namespace", "app=foo").Return(tt.pods, tt.getErr)
-			p.EXPECT().DeletePod(ctx, "namespace", "foo-bad").Return(tt.delErr).Maybe()
+			p.EXPECT().GetPodsForLabelSelector(ctx, "namespace", "app=foo").Return(tt.pods, tt.getErr).Once()
+			if tt.wantDelete {
+				p.EXPECT().DeletePod(ctx, "namespace", "foo-bad").Return(tt.delErr).Once()
+			}
+			p.EXPECT().Disconnect().Once()
 
-			r := Reaper{Client: p}
-			count, err := r.Reap(context.Background(), "namespace", "app=foo")
+			s := scanner.Scanner{
+				Client:        p,
+				Namespace:     "namespace",
+				LabelSelector: "app=foo",
+				Logger:        slog.Default()}
+			err := s.ScanOnce(context.Background())
 			tt.wantErr(t, err)
-			assert.Equal(t, tt.want, count)
 		})
 	}
+}
+
+func TestScanner_Scan(t *testing.T) {
+	c := mocks.NewPodMan(t)
+	s := scanner.Scanner{
+		Namespace:     "namespace",
+		LabelSelector: "app=foo",
+		Client:        c,
+		Logger:        slog.Default(),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch := make(chan struct{})
+	c.EXPECT().GetPodsForLabelSelector(ctx, s.Namespace, s.LabelSelector).Return(nil, errors.New("fail"))
+	c.EXPECT().Disconnect().Run(func() {
+		ch <- struct{}{}
+	})
+
+	go s.Scan(ctx, 10*time.Millisecond)
+	<-ch
 }
