@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,7 +23,7 @@ func (c *Client) client() kubernetes.Interface {
 	if c.kClient == nil {
 		var err error
 		if c.kClient, err = c.Connect(); err != nil {
-			panic(err)
+			panic(fmt.Errorf("failed to connect to cluster: %w", err))
 		}
 	}
 	return c.kClient

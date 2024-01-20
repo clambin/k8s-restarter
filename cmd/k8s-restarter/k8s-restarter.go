@@ -6,7 +6,6 @@ import (
 	"flag"
 	"github.com/clambin/k8s-restarter/internal/client"
 	"github.com/clambin/k8s-restarter/internal/k8s"
-	"github.com/clambin/k8s-restarter/internal/reaper"
 	"github.com/clambin/k8s-restarter/internal/scanner"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go"
@@ -48,11 +47,8 @@ func main() {
 	s := scanner.Scanner{
 		Namespace:     *namespace,
 		LabelSelector: *selector,
-		Reaper: &reaper.Reaper{
-			Client: &client.Client{Connect: k8s.Connector(l)},
-			Logger: l.With("component", "reaper"),
-		},
-		Logger: l,
+		Client:        &client.Client{Connect: k8s.Connector(l)},
+		Logger:        l,
 	}
 
 	if err := s.ScanOnce(ctx); err != nil {
