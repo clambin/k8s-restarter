@@ -74,7 +74,7 @@ func TestClient_GetPodsForLabelSelector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			c := Client{Connector: func() (kubernetes.Interface, error) {
+			c := Client{Connect: func() (kubernetes.Interface, error) {
 				return fake.NewSimpleClientset(tt.objects...), nil
 			}}
 			pods, err := c.GetPodsForLabelSelector(ctx, tt.args.namespace, tt.args.labelSelector)
@@ -87,6 +87,8 @@ func TestClient_GetPodsForLabelSelector(t *testing.T) {
 			for _, pod := range pods {
 				assert.NoError(t, c.DeletePod(ctx, tt.args.namespace, pod.GetName()))
 			}
+
+			c.Disconnect()
 		})
 	}
 }

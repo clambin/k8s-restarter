@@ -7,3 +7,6 @@ packages:
   github.com/clambin/k8s-restarter/internal/reaper:
     interfaces:
       PodMan:
+  github.com/clambin/k8s-restarter/internal/scanner:
+    interfaces:
+      Reaper:

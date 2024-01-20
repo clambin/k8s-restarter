@@ -4,19 +4,16 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/clambin/k8s-restarter/internal/client"
+	"github.com/clambin/k8s-restarter/internal/k8s"
 	"github.com/clambin/k8s-restarter/internal/reaper"
+	"github.com/clambin/k8s-restarter/internal/scanner"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -40,76 +37,41 @@ func main() {
 	if *debug {
 		opts.Level = slog.LevelDebug
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &opts)))
+	l := slog.New(slog.NewJSONHandler(os.Stderr, &opts))
 
-	slog.Info("k8s-restarter", "version", version)
-	go runPrometheusServer()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go scan(ctx, *interval)
+	l.Info("k8s-restarter", "version", version)
+	go runPrometheusServer(l)
 
 	ctx, done := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer done()
+
+	s := scanner.Scanner{
+		Namespace:     *namespace,
+		LabelSelector: *selector,
+		Reaper: &reaper.Reaper{
+			Client: &client.Client{Connect: k8s.Connector(l)},
+			Logger: l.With("component", "reaper"),
+		},
+		Logger: l,
+	}
+
+	if err := s.ScanOnce(ctx); err != nil {
+		l.Error("failed to scan for dead pods", "err", err)
+		return
+	}
+
+	if *once {
+		return
+	}
+
+	go s.Scan(ctx, *interval)
 	<-ctx.Done()
 }
 
-func scan(ctx context.Context, interval time.Duration) {
-	slog.Info("scanner started", "interval", interval, "namespace", *namespace, "deployment", *selector)
-	defer slog.Info("scanner stopped")
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		if err := check(ctx, *namespace, *selector); err != nil {
-			slog.Error("scan failed", "err", err)
-		}
-		if *once {
-			return
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func check(ctx context.Context, namespace, name string) error {
-	r := reaper.Reaper{Client: &client.Client{Connector: connect}}
-	deleted, err := r.Reap(ctx, namespace, name)
-	if err == nil {
-		if deleted > 0 {
-			slog.Info("deleted failing deployment", "count", deleted)
-		}
-	}
-	return err
-}
-
-func connect() (kubernetes.Interface, error) {
-	cfg, err := rest.InClusterConfig()
-	if err != nil {
-		// not running inside cluster. try to connect as external client
-		userHomeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("user home dir: %w", err)
-		}
-		kubeConfigPath := filepath.Join(userHomeDir, ".kube", "config")
-		slog.Debug("not running inside cluster. using kube config", "filename", kubeConfigPath)
-
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("kubernetes config: %w", err)
-		}
-	}
-	return kubernetes.NewForConfig(cfg)
-}
-
-func runPrometheusServer() {
+func runPrometheusServer(l *slog.Logger) {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	if !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("failed to start prometheus metrics server", "err", err)
+		l.Error("failed to start prometheus metrics server", "err", err)
 	}
 }

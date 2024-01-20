@@ -11,9 +11,9 @@ import (
 type ConnectorFunc func() (kubernetes.Interface, error)
 
 type Client struct {
-	Connector ConnectorFunc
-	lock      sync.Mutex
-	kClient   kubernetes.Interface
+	Connect ConnectorFunc
+	lock    sync.Mutex
+	kClient kubernetes.Interface
 }
 
 func (c *Client) client() kubernetes.Interface {
@@ -21,7 +21,7 @@ func (c *Client) client() kubernetes.Interface {
 	defer c.lock.Unlock()
 	if c.kClient == nil {
 		var err error
-		if c.kClient, err = c.Connector(); err != nil {
+		if c.kClient, err = c.Connect(); err != nil {
 			panic(err)
 		}
 	}
@@ -38,4 +38,10 @@ func (c *Client) GetPodsForLabelSelector(ctx context.Context, namespace string, 
 
 func (c *Client) DeletePod(ctx context.Context, namespace, name string) error {
 	return c.client().CoreV1().Pods(namespace).Delete(ctx, name, metaV1.DeleteOptions{})
+}
+
+func (c *Client) Disconnect() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.kClient = nil
 }
