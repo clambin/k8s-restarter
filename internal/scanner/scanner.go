@@ -65,7 +65,7 @@ func (s Scanner) getNotReady(pods []coreV1.Pod) []coreV1.Pod {
 
 		l.Debug("checking pod")
 
-		status := getReadyStatus(pod)
+		status := getPodConditionStatus(pod, coreV1.PodReady)
 		switch status {
 		case coreV1.ConditionTrue:
 			l.Debug("pod is ready")
@@ -80,9 +80,9 @@ func (s Scanner) getNotReady(pods []coreV1.Pod) []coreV1.Pod {
 	return notReady
 }
 
-func getReadyStatus(pod coreV1.Pod) coreV1.ConditionStatus {
+func getPodConditionStatus(pod coreV1.Pod, conditionType coreV1.PodConditionType) coreV1.ConditionStatus {
 	for _, condition := range pod.Status.Conditions {
-		if condition.Type == coreV1.PodReady {
+		if condition.Type == conditionType {
 			return condition.Status
 		}
 	}
