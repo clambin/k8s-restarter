@@ -21,7 +21,7 @@ type PodMan interface {
 	Disconnect()
 }
 
-func (s Scanner) Scan(ctx context.Context, interval time.Duration) {
+func (s Scanner) Scan(ctx context.Context, interval time.Duration, once bool) {
 	s.Logger.Info("scanner started", "interval", interval, "namespace", s.Namespace, "selector", s.LabelSelector)
 	defer s.Logger.Info("scanner stopped")
 
@@ -29,13 +29,17 @@ func (s Scanner) Scan(ctx context.Context, interval time.Duration) {
 	defer ticker.Stop()
 
 	for {
+		if err := s.ScanOnce(ctx); err != nil {
+			s.Logger.Error("scan failed", "err", err)
+		}
+
+		if once {
+			break
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := s.ScanOnce(ctx); err != nil {
-				s.Logger.Error("scan failed", "err", err)
-			}
 		}
 	}
 }

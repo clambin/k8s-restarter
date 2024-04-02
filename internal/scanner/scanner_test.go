@@ -83,7 +83,6 @@ func TestScanner_ScanOnce(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -124,6 +123,30 @@ func TestScanner_Scan(t *testing.T) {
 		ch <- struct{}{}
 	})
 
-	go s.Scan(ctx, 10*time.Millisecond)
+	go s.Scan(ctx, 10*time.Millisecond, false)
+	<-ch
+	<-ch
+	<-ch
+}
+
+func TestScanner_Scan_Once(t *testing.T) {
+	c := mocks.NewPodMan(t)
+	s := scanner.Scanner{
+		Namespace:     "namespace",
+		LabelSelector: "app=foo",
+		Client:        c,
+		Logger:        slog.Default(),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch := make(chan struct{})
+	c.EXPECT().GetPodsForLabelSelector(ctx, s.Namespace, s.LabelSelector).Return(nil, errors.New("fail"))
+	c.EXPECT().Disconnect().Run(func() {
+		ch <- struct{}{}
+	})
+
+	go s.Scan(ctx, 10*time.Millisecond, true)
 	<-ch
 }

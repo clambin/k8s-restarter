@@ -51,16 +51,7 @@ func main() {
 		Logger:        l,
 	}
 
-	if err := s.ScanOnce(ctx); err != nil {
-		l.Error("failed to scan for dead pods", "err", err)
-		return
-	}
-
-	if *once {
-		return
-	}
-
-	go s.Scan(ctx, *interval)
+	go s.Scan(ctx, *interval, *once)
 	<-ctx.Done()
 }
 

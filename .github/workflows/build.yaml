@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - refactor
+      - build
     paths-ignore:
       - 'assets/**'
 
@@ -16,6 +16,6 @@ jobs:
   build:
     needs:
       - test
-    uses: clambin/workflows/.github/workflows/build.yaml@main
+    uses: clambin/workflows/.github/workflows/build.yaml@docker
     with:
-      target: k8s-restarter
+      image: ghcr.io/clambin/k8s-restarter

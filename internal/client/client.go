@@ -34,6 +34,9 @@ func (c *Client) GetPodsForLabelSelector(ctx context.Context, namespace string, 
 		CoreV1().
 		Pods(namespace).
 		List(ctx, metaV1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, err
+	}
 	return pods.Items, err
 }
 
