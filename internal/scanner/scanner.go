@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"iter"
 	coreV1 "k8s.io/api/core/v1"
 	"log/slog"
 	"time"
@@ -52,7 +53,7 @@ func (s Scanner) ScanOnce(ctx context.Context) error {
 		return fmt.Errorf("GetPodsForLabelSelector: %w", err)
 	}
 
-	for _, pod := range s.getNotReady(pods) {
+	for pod := range s.getNotReady(pods) {
 		if err := s.Client.DeletePod(ctx, s.Namespace, pod.GetName()); err != nil {
 			s.Logger.Warn("failed to delete pod", "err", err, "name", pod.GetName())
 			continue
@@ -62,26 +63,27 @@ func (s Scanner) ScanOnce(ctx context.Context) error {
 	return err
 }
 
-func (s Scanner) getNotReady(pods []coreV1.Pod) []coreV1.Pod {
-	notReady := make([]coreV1.Pod, 0, len(pods))
-	for _, pod := range pods {
-		l := s.Logger.With("name", pod.GetName())
+func (s Scanner) getNotReady(pods []coreV1.Pod) iter.Seq[coreV1.Pod] {
+	return func(yield func(coreV1.Pod) bool) {
+		for _, pod := range pods {
+			l := s.Logger.With("name", pod.GetName())
 
-		l.Debug("checking pod")
+			l.Debug("checking pod")
 
-		status := getPodConditionStatus(pod, coreV1.PodReady)
-		switch status {
-		case coreV1.ConditionTrue:
-			l.Debug("pod is ready")
-		case coreV1.ConditionFalse:
-			l.Debug("pod not ready")
-			notReady = append(notReady, pod)
-		default:
-			l.Debug("pod doesn't appear to be running", "status", status)
+			status := getPodConditionStatus(pod, coreV1.PodReady)
+			switch status {
+			case coreV1.ConditionTrue:
+				l.Debug("pod is ready")
+			case coreV1.ConditionFalse:
+				l.Debug("pod not ready")
+				if !yield(pod) {
+					return
+				}
+			default:
+				l.Debug("pod doesn't appear to be running", "status", status)
+			}
 		}
 	}
-
-	return notReady
 }
 
 func getPodConditionStatus(pod coreV1.Pod, conditionType coreV1.PodConditionType) coreV1.ConditionStatus {
