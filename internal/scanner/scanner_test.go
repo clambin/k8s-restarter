@@ -84,8 +84,6 @@ func TestScanner_ScanOnce(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			ctx := context.Background()
 			p := mocks.NewPodMan(t)
 			p.EXPECT().GetPodsForLabelSelector(ctx, "namespace", "app=foo").Return(tt.pods, tt.getErr).Once()
@@ -98,7 +96,7 @@ func TestScanner_ScanOnce(t *testing.T) {
 				Client:        p,
 				Namespace:     "namespace",
 				LabelSelector: "app=foo",
-				Logger:        slog.Default()}
+				Logger:        slog.New(slog.DiscardHandler)}
 			err := s.ScanOnce(context.Background())
 			tt.wantErr(t, err)
 		})
@@ -111,12 +109,10 @@ func TestScanner_Scan(t *testing.T) {
 		Namespace:     "namespace",
 		LabelSelector: "app=foo",
 		Client:        c,
-		Logger:        slog.Default(),
+		Logger:        slog.New(slog.DiscardHandler),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+	ctx := t.Context()
 	ch := make(chan struct{})
 	c.EXPECT().GetPodsForLabelSelector(ctx, s.Namespace, s.LabelSelector).Return(nil, errors.New("fail"))
 	c.EXPECT().Disconnect().Run(func() {
@@ -135,7 +131,7 @@ func TestScanner_Scan_Once(t *testing.T) {
 		Namespace:     "namespace",
 		LabelSelector: "app=foo",
 		Client:        c,
-		Logger:        slog.Default(),
+		Logger:        slog.New(slog.DiscardHandler),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
