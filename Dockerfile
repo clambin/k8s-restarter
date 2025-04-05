@@ -10,7 +10,7 @@ WORKDIR /app/
 ADD . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build \
-    -ldflags="-X github.com/clambin/k8s-restarter/internal/restarter.version=$VERSION" \
+    -ldflags="-X main.version=$VERSION" \
     -o k8s-restarter \
     k8s-restarter.go
 
