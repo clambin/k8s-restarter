@@ -1,4 +1,4 @@
-package client
+package restarter
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func TestClient_GetPodsForLabelSelector(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			c := Client{Connect: func() (kubernetes.Interface, error) {
-				return fake.NewSimpleClientset(tt.objects...), nil
+				return fake.NewClientset(tt.objects...), nil
 			}}
 			pods, err := c.GetPodsForLabelSelector(ctx, tt.args.namespace, tt.args.labelSelector)
 			tt.wantErr(t, err)

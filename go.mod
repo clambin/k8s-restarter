@@ -1,6 +1,6 @@
 module github.com/clambin/k8s-restarter
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/prometheus/client_golang v1.21.1
