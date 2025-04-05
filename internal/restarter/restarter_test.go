@@ -1,10 +1,8 @@
-package scanner_test
+package restarter
 
 import (
-	"context"
 	"errors"
-	"github.com/clambin/k8s-restarter/internal/scanner"
-	"github.com/clambin/k8s-restarter/internal/scanner/mocks"
+	"github.com/clambin/k8s-restarter/internal/restarter/mocks"
 	"github.com/stretchr/testify/assert"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +11,7 @@ import (
 	"time"
 )
 
-func TestScanner_ScanOnce(t *testing.T) {
+func TestScanOnce(t *testing.T) {
 	tests := []struct {
 		name       string
 		pods       []coreV1.Pod
@@ -84,65 +82,34 @@ func TestScanner_ScanOnce(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			p := mocks.NewPodMan(t)
+			ctx := t.Context()
+			p := mocks.NewK8SClient(t)
 			p.EXPECT().GetPodsForLabelSelector(ctx, "namespace", "app=foo").Return(tt.pods, tt.getErr).Once()
 			if tt.wantDelete {
 				p.EXPECT().DeletePod(ctx, "namespace", "foo-bad").Return(tt.delErr).Once()
 			}
 			p.EXPECT().Disconnect().Once()
 
-			s := scanner.Scanner{
-				Client:        p,
-				Namespace:     "namespace",
-				LabelSelector: "app=foo",
-				Logger:        slog.New(slog.DiscardHandler)}
-			err := s.ScanOnce(context.Background())
+			err := ScanOnce(ctx, p, "namespace", "app=foo", slog.New(slog.DiscardHandler))
 			tt.wantErr(t, err)
 		})
 	}
 }
 
-func TestScanner_Scan(t *testing.T) {
-	c := mocks.NewPodMan(t)
-	s := scanner.Scanner{
-		Namespace:     "namespace",
-		LabelSelector: "app=foo",
-		Client:        c,
-		Logger:        slog.New(slog.DiscardHandler),
-	}
-
+func TestScan(t *testing.T) {
 	ctx := t.Context()
 	ch := make(chan struct{})
-	c.EXPECT().GetPodsForLabelSelector(ctx, s.Namespace, s.LabelSelector).Return(nil, errors.New("fail"))
+	c := mocks.NewK8SClient(t)
+	c.EXPECT().GetPodsForLabelSelector(ctx, "namespace", "app=foo").Return(nil, errors.New("fail"))
 	c.EXPECT().Disconnect().Run(func() {
 		ch <- struct{}{}
 	})
 
-	go s.Scan(ctx, 10*time.Millisecond, false)
+	go func() {
+		assert.NoError(t, Scan(ctx, c, "namespace", "app=foo", 10*time.Millisecond, "change-me", slog.New(slog.DiscardHandler)))
+	}()
+
 	<-ch
 	<-ch
-	<-ch
-}
-
-func TestScanner_Scan_Once(t *testing.T) {
-	c := mocks.NewPodMan(t)
-	s := scanner.Scanner{
-		Namespace:     "namespace",
-		LabelSelector: "app=foo",
-		Client:        c,
-		Logger:        slog.New(slog.DiscardHandler),
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ch := make(chan struct{})
-	c.EXPECT().GetPodsForLabelSelector(ctx, s.Namespace, s.LabelSelector).Return(nil, errors.New("fail"))
-	c.EXPECT().Disconnect().Run(func() {
-		ch <- struct{}{}
-	})
-
-	go s.Scan(ctx, 10*time.Millisecond, true)
 	<-ch
 }

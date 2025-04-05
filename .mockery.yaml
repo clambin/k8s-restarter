@@ -4,6 +4,9 @@ dir: "{{.InterfaceDir}}/mocks"
 mockname: "{{.InterfaceName}}"
 outpkg: "mocks"
 packages:
-  github.com/clambin/k8s-restarter/internal/scanner:
+  github.com/clambin/k8s-restarter/internal/restarter:
     interfaces:
-      PodMan:
+      K8SClient:
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
