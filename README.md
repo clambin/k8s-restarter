@@ -5,3 +5,5 @@
 [![Build](https://github.com/clambin/k8s-restarter/workflows/Build/badge.svg)](https://github.com/clambin/k8s-restarter/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/clambin/k8s-restarter)](https://goreportcard.com/report/github.com/clambin/k8s-restarter)
 [![License](https://img.shields.io/github/license/clambin/k8s-restarter?style=plastic)](LICENSE.md)
+
+Deprecated: moves to https://codeberg.org/clambin/k8s-restarter
